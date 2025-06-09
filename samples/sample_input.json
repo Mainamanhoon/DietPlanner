@@ -1,0 +1,14 @@
+{
+  "Name of the employee": "Alice",
+  "Official Email address": "alice@company.com",
+  "Department": "Engineering",
+  "Gender": "Female",
+  "Age": "28",
+  "Weight & Height": "60kg, 165cm",
+  "Activity level": "Sedentary",
+  "Rate your stress level": "3",
+  "Goals": "Fat loss",
+  "Diet type": "Vegetarian",
+  "Meal frequency in a day": "3",
+  "Any food allergies": "Lactose Intolerance"
+}
