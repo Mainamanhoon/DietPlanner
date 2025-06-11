@@ -1,64 +1,83 @@
 # ai_engine/pdf_generator.py
-import json
-import logging
+
+import math
 from fpdf import FPDF
-
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-
 
 def create_pdf(plan: dict, filename: str):
     """
-    Render the 7-day diet plan in a tabular PDF with columns: Day, Breakfast, Lunch, Dinner.
-    Supports both list and dict formats for "7DayPlan".
+    Render the 7-day plan as a neat landscape table with:
+      - Columns: Day | [Dynamic meal columns]
+      - Wrapped text, padding, dynamic row heights
+      - Handles any number of meals per day (3-5)
     """
-    # Log the plan data once before generating PDF
-    logger.debug("Diet plan data:\n%s", json.dumps(plan, indent=2))
-
-    pdf = FPDF()
+    pdf = FPDF(orientation='L', unit='mm', format='A4')
+    pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, "Personalized 7-Day Diet Plan", ln=1, align="C")
+
+    # Title
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, "Personalized 7-Day Diet Plan", ln=True, align="C")
     pdf.ln(5)
 
-    # Table header
-    pdf.set_font("Arial", "B", 12)
-    col_widths = [30, 60, 60, 60]
-    headers = ["Day", "Breakfast", "Lunch", "Dinner"]
-    for idx, header in enumerate(headers):
-        pdf.cell(col_widths[idx], 10, header, border=1, align="C")
+    # --- Dynamically determine meal columns ---
+    meal_keys = set()
+    for entry in plan.get("7DayPlan", []):
+        for key in entry.keys():
+            if key.lower() != "day":
+                meal_keys.add(key)
+    meal_keys = sorted(meal_keys)  # e.g., ['Breakfast', 'Dinner', 'Lunch', 'Snacks']
+
+    headers = ["Day"] + meal_keys
+    col_count = len(headers)
+    col_width = 280 / col_count  # Adjust to fit your page width
+
+    # Draw headers
+    pdf.set_font("Helvetica", "B", 12)
+    for h in headers:
+        pdf.cell(col_width, 10, h, border=1, align="C")
     pdf.ln()
 
-    # Extract day entries
-    raw_days = plan.get("7DayPlan")
-    if isinstance(raw_days, list):
-        days_list = raw_days
-    elif isinstance(raw_days, dict):
-        days_list = [{"day": day, **data} for day, data in raw_days.items()]
-    else:
-        days_list = []
+    # Body settings
+    padding     = 3    # mm
+    line_h      = 5    # mm per text line
+    left_margin = pdf.l_margin
+    pdf.set_font("Helvetica", "", 10)
 
-    # Table rows
-    pdf.set_font("Arial", size=10)
-    for entry in days_list:
-        day_label = entry.get("day", "-")
-        meals = entry.get("Meals") or entry.get("meals") or {}
+    for entry in plan.get("7DayPlan", []):
+        cells = [entry.get("Day", "")] + [entry.get(key, "") for key in meal_keys]
 
-        def brief(meal_name: str) -> str:
-            item = meals.get(meal_name) or meals.get(meal_name.lower(), {})
-            desc = item.get("description", "")
-            return desc.split(",")[0].split("(")[0].strip() if desc else "-"
+        # Compute needed lines per cell
+        line_counts = []
+        for text in cells:
+            usable_w = col_width - 2 * padding
+            text_w   = pdf.get_string_width(text)
+            lines    = max(1, math.ceil(text_w / usable_w))
+            line_counts.append(lines)
 
-        row = [
-            day_label,
-            brief("Breakfast"),
-            brief("Lunch"),
-            brief("Dinner")
-        ]
-        for idx, text in enumerate(row):
-            pdf.cell(col_widths[idx], 10, text, border=1)
-        pdf.ln()
+        # Row height
+        max_lines = max(line_counts)
+        row_h     = max_lines * line_h + 2 * padding
 
-    # Save PDF file
+        # Draw cell borders
+        x = left_margin
+        y = pdf.get_y()
+        for _ in headers:
+            pdf.rect(x, y, col_width, row_h)
+            x += col_width
+
+        # Fill text
+        x = left_margin
+        for idx, text in enumerate(cells):
+            pdf.set_xy(x + padding, y + padding)
+            pdf.multi_cell(
+                w    = col_width - 2 * padding,
+                h    = line_h,
+                txt  = text,
+                border = 0
+            )
+            x += col_width
+
+        # Next row
+        pdf.set_y(y + row_h)
+
     pdf.output(filename)

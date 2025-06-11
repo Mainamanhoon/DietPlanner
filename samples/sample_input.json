@@ -1,14 +1,18 @@
 {
-  "Name of the employee": "Alice",
-  "Official Email address": "alice@company.com",
+  "Name of the employee": "Alice Sharma",
+  "Official Email address": "alice.sharma@wellnetic.com",
   "Department": "Engineering",
   "Gender": "Female",
   "Age": "28",
   "Weight & Height": "60kg, 165cm",
   "Activity level": "Sedentary",
   "Rate your stress level": "3",
-  "Goals": "Fat loss",
-  "Diet type": "Vegetarian",
+  "Goals": "Fat Loss",
+  "Diet type": "Non-Vegetarian",
   "Meal frequency in a day": "3",
-  "Any food allergies": "Lactose Intolerance"
+  "Non-Veg Days": ["Day 2", "Day 5"],
+  "Health Conditions": [ "PCOS"],
+  "Culture preference": "North Indian",
+  "Any food allergies": "Gluten Intolerance",
+  "Any additional information you would like to share": "Needs quick breakfast options on weekdays"
 }
