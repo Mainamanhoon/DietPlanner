@@ -1,0 +1,159 @@
+{
+  "7DayPlan": [
+    {
+      "Day": 1,
+      "Breakfast": {
+        "Idiyappam": {
+          "Quantity": "1 plate",
+          "Weight": "64.0g"
+        }
+      },
+      "Lunch": {
+        "Vegetable Pasta Salad + Lemon Dressing": {
+          "Quantity": "1 bowl",
+          "Weight": "115.2g"
+        }
+      },
+      "Dinner": {
+        "Curd Rice": {
+          "Quantity": "1 bowl",
+          "Weight": "128.0g"
+        }
+      }
+    },
+    {
+      "Day": 2,
+      "Breakfast": {
+        "Uttapam + Coconut Chutney": {
+          "Quantity": "2 pieces + 50g",
+          "Weight": "136.0g"
+        }
+      },
+      "Lunch": {
+        "Sprouted Moong Curry + Rice": {
+          "Quantity": "1 bowl + rice",
+          "Weight": "140.8g"
+        }
+      },
+      "Dinner": {
+        "Lauki Soup + Whole Wheat Roti": {
+          "Quantity": "1 bowl + roti",
+          "Weight": "128.0g"
+        }
+      }
+    },
+    {
+      "Day": 3,
+      "Breakfast": {
+        "Masala oats": {
+          "Quantity": "1 cup",
+          "Weight": "64.0g"
+        }
+      },
+      "Lunch": {
+        "Soya Wrap + Salad + Yogurt": {
+          "Quantity": "1 wrap + sides",
+          "Weight": "128.0g"
+        }
+      },
+      "Dinner": {
+        "Paneer Tikka Wrap + Yogurt Dressing": {
+          "Quantity": "1 wrap",
+          "Weight": "115.2g"
+        }
+      }
+    },
+    {
+      "Day": 4,
+      "Breakfast": {
+        "Vegetable Appe": {
+          "Quantity": "5 pieces",
+          "Weight": "96.0g"
+        }
+      },
+      "Lunch": {
+        "Pulihora": {
+          "Quantity": "1 bowl",
+          "Weight": "96.0g"
+        }
+      },
+      "Dinner": {
+        "Stuffed Eggplant + Bajra Roti": {
+          "Quantity": "2 eggplants + 2 roti",
+          "Weight": "192.0g"
+        }
+      }
+    },
+    {
+      "Day": 5,
+      "Breakfast": {
+        "Besan Chilla + Green Chutney": {
+          "Quantity": "2 chillas + 50g",
+          "Weight": "120.0g"
+        }
+      },
+      "Lunch": {
+        "Kappa (Tapioca)": {
+          "Quantity": "1 bowl",
+          "Weight": "64.0g"
+        }
+      },
+      "Dinner": {
+        "Sprout Salad + Lemon": {
+          "Quantity": "1 bowl",
+          "Weight": "160.0g"
+        }
+      }
+    },
+    {
+      "Day": 6,
+      "Breakfast": {
+        "Rava Idli": {
+          "Quantity": "2 pieces",
+          "Weight": "64.0g"
+        }
+      },
+      "Lunch": {
+        "Mixed Sprout Salad + Lemon Dressing": {
+          "Quantity": "1 large bowl",
+          "Weight": "128.0g"
+        }
+      },
+      "Dinner": {
+        "Vegetable Soup + Multigrain Roti": {
+          "Quantity": "1 bowl + roti",
+          "Weight": "128.0g"
+        }
+      }
+    },
+    {
+      "Day": 7,
+      "Breakfast": {
+        "Milk oats": {
+          "Quantity": "1 cup",
+          "Weight": "64.0g"
+        }
+      },
+      "Lunch": {
+        "Whole Wheat Pasta + Vegetables + Paneer": {
+          "Quantity": "1 bowl",
+          "Weight": "128.0g"
+        }
+      },
+      "Dinner": {
+        "Bisi Bele Bhat": {
+          "Quantity": "1 bowl",
+          "Weight": "96.0g"
+        }
+      }
+    }
+  ],
+  "Summary": {
+    "AverageCalories": "1555 kcal/day",
+    "AverageMacros": {
+      "Protein": "53g",
+      "Carbs": "215g",
+      "Fats": "40g"
+    }
+  }
+}

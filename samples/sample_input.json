@@ -1,19 +1,18 @@
 {
-  "Name of the employee": "Aman Agrawal",
-  "Official Email address": ".com",
-  "Department": "IT MAjdoor",
-  "Gender": "Male",
-  "Age": "22",
-  "Weight & Height": "85kg, 177cm",
-  "Activity level": "8",
-  "Rate your stress level": "7",
-  "Goals": "Fat loss",
-  "Diet type": "eggetarian",
+  "Name of the employee": "Archana Kumari",
+  "Official Email address": "archanakumari@idigitalpreneur.com",
+  "Department": "Graphic Designing",
+  "Gender": "Female",
+  "Age": "28",
+  "Weight & Height": "62kg, 164cm",
+  "Activity level": "5",
+  "Rate your stress level": "4",
+  "Goals": "Fat Loss",
+  "Diet type": "Vegetarian",
   "Meal frequency in a day": "3",
-  "Non-Veg Days": [],
+  "Non-Veg Days": ["Monday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
   "Health Conditions": [""],
-  "Culture preference": "Both",
+  "Culture preference": "Only Indian",
   "Any food allergies": "",
-  "Any additional information you would like to share": ""
+  "Any additional information you would like to share": "I only prefer no onion garlic food"
 }
- 

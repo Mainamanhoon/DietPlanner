@@ -53,7 +53,7 @@ def compute_macros(calories: float, goal: str) -> dict:
         "Fats_g":    round((calories * r["fats"])    / 9, 1)
     }
 
-def generate_plan(user_data: dict) -> dict:
+def generate_plan(user_data: dict, csv_path: str = "samples/CuisineList.csv") -> dict:
     # 1) Parse
     w, h = parse_weight_height(user_data["Weight & Height"])
     age    = int(user_data["Age"])
@@ -74,5 +74,5 @@ def generate_plan(user_data: dict) -> dict:
         "macros": macros
     }
 
-    # 4) Call GPT
-    return get_diet_plan_via_gpt(payload)
+    # 4) Call GPT with CSV path
+    return get_diet_plan_via_gpt(payload, csv_path=csv_path)
