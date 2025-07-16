@@ -16,6 +16,38 @@ def calculate_bmr(weight: float, height: float, age: int, gender: str) -> float:
     else:
         return 10*weight + 6.25*height - 5*age - 161
 
+def normalize_activity_level(activity):
+    """Convert numeric or string activity level to standard string format"""
+    if isinstance(activity, (int, float)) or (isinstance(activity, str) and activity.isdigit()):
+        # Convert numeric scale (1-10) to activity categories
+        activity_num = int(float(activity))
+        if activity_num <= 2:
+            return "Sedentary"
+        elif activity_num <= 4:
+            return "Lightly active"
+        elif activity_num <= 6:
+            return "Moderately active"
+        elif activity_num <= 8:
+            return "Very active"
+        else:
+            return "Extra active"
+    
+    # Handle string inputs
+    activity_str = str(activity).lower()
+    if "sedentary" in activity_str or "inactive" in activity_str:
+        return "Sedentary"
+    elif "lightly" in activity_str or "light" in activity_str:
+        return "Lightly active"
+    elif "moderately" in activity_str or "moderate" in activity_str:
+        return "Moderately active"
+    elif "very" in activity_str or "highly" in activity_str:
+        return "Very active"
+    elif "extra" in activity_str or "extremely" in activity_str:
+        return "Extra active"
+    else:
+        # Default fallback
+        return "Lightly active"
+
 def calculate_tdee(bmr: float, activity: str) -> float:
     factors = {
         "Sedentary": 1.2,
@@ -53,19 +85,24 @@ def compute_macros(calories: float, goal: str) -> dict:
         "Fats_g":    round((calories * r["fats"])    / 9, 1)
     }
 
-def generate_plan(user_data: dict, csv_path: str = "samples/CuisineList.csv") -> dict:
+def generate_plan(user_data: dict) -> dict:
     # 1) Parse
     w, h = parse_weight_height(user_data["Weight & Height"])
     age    = int(user_data["Age"])
     gender = user_data["Gender"]
-    activity = user_data["Activity level"]
+    activity_raw = user_data["Activity level"]
+    activity = normalize_activity_level(activity_raw)
     goal = user_data["Goals"]
+
+    print(f"Parsed activity level: '{activity_raw}' -> '{activity}'")
 
     # 2) Compute
     bmr  = calculate_bmr(w, h, age, gender)
     tdee = calculate_tdee(bmr, activity)
     cal_goal = adjust_calories(tdee, goal)
     macros   = compute_macros(cal_goal, goal)
+
+    print(f"BMR: {bmr:.0f}, TDEE: {tdee:.0f}, Calorie Goal: {cal_goal:.0f}")
 
     # 3) Build payload
     payload = {
@@ -74,5 +111,5 @@ def generate_plan(user_data: dict, csv_path: str = "samples/CuisineList.csv") ->
         "macros": macros
     }
 
-    # 4) Call GPT with CSV path
-    return get_diet_plan_via_gpt(payload, csv_path=csv_path)
+    # 4) Call GPT
+    return get_diet_plan_via_gpt(payload)

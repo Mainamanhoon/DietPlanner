@@ -1,169 +1,161 @@
 import sys, json
-from ai_engine.planner     import generate_plan
-from ai_engine.pdf_generator import create_pdf
-from ai_engine.openai_client import calculate_quantity_multiplier
+from ai_engine.planner import generate_plan
+from ai_engine.pdf_generator import create_pdf, create_detailed_pdf
 
 def load_input(path: str) -> dict:
     with open(path, "r") as f:
         return json.load(f)
 
-def run(input_path: str, output_pdf: str, csv_path: str = "samples/CuisineList.csv"):
+def validate_plan_format(plan):
+    """Validate that the plan has the expected format"""
+    print("\n=== Plan Validation ===")
+    
+    if not isinstance(plan, dict):
+        print("X Plan is not a dictionary")
+        return False
+    
+    if "7DayPlan" not in plan:
+        print("X Missing '7DayPlan' key")
+        return False
+    
+    days = plan["7DayPlan"]
+    if not isinstance(days, list) or len(days) != 7:
+        print(f"X '7DayPlan' should be a list of 7 days, got {len(days) if isinstance(days, list) else 'not a list'}")
+        return False
+    
+    print(f"OK Found 7 days")
+    
+    # Check meal structure
+    meal_count = 0
+    for i, day in enumerate(days):
+        day_name = day.get("Day", f"Day {i+1}")
+        for meal_name, meal_data in day.items():
+            if meal_name != "Day":
+                meal_count += 1
+                if isinstance(meal_data, dict):
+                    print(f"OK {day_name} - {meal_name}: Dictionary format with {len(meal_data)} items")
+                elif isinstance(meal_data, str):
+                    print(f"OK {day_name} - {meal_name}: String format")
+                else:
+                    print(f"! {day_name} - {meal_name}: Unexpected format - {type(meal_data)}")
+    
+    print(f"OK Total meals found: {meal_count}")
+    print("======================\n")
+    return True
+
+def run(input_path: str, output_pdf: str, format_type: str = "table"):
+    # """
+    # Generate diet plan and create PDF
+
+    # Args:
+    #     input_path: Path to input JSON file
+    #     output_pdf: Path for output PDF
+    #     format_type: "table" or "detailed"
+    # """
+    # print(f"Loading input from: {input_path}")
+    # data = load_input(input_path)
+
+    # print("Generating diet plan...")
+    # plan = generate_plan(data)
+
+    # if plan is None:
+    #     print("❌ Diet plan generation failed. Please review the input filters or dish database.")
+    #     return
+
+    # print("\n=== Plan Structure Preview ===")
+    # if "7DayPlan" in plan and len(plan["7DayPlan"]) > 0:
+    #     first_day = plan["7DayPlan"][0]
+    #     print(f"First day structure: {first_day.get('Day', 'Unknown')}")
+    #     for meal_name, meal_data in first_day.items():
+    #         if meal_name != "Day":
+    #             preview = str(meal_data)[:100] + "..." if len(str(meal_data)) > 100 else str(meal_data)
+    #             print(f"  {meal_name}: {preview}")
+    # else:
+    #     print("❗ Plan is empty or malformed. Skipping preview.")
+
+    # print("===============================\n")
+
+    # # Validate structure
+    # validate_plan_format(plan)
+
+    # # Create PDF
+    # print(f"Creating {format_type} format PDF...")
+    # if format_type.lower() == "detailed":
+    #     create_detailed_pdf(plan, output_pdf)
+    # else:
+    #     create_pdf(plan, output_pdf)
+
+    # print(f"✅ PDF generated at: {output_pdf}")
+
+    # # Show summary
+    # if "Summary" in plan:
+    #     print("\nPlan Summary:")
+    #     summary = plan["Summary"]
+    #     if "AverageCalories" in summary:
+    #         print(f"  Average Calories: {summary['AverageCalories']}")
+    #     if "AverageMacros" in summary:
+    #         macros = summary["AverageMacros"]
+    #         print(f"  Macros: P:{macros.get('Protein', 'N/A')} | C:{macros.get('Carbs', 'N/A')} | F:{macros.get('Fats', 'N/A')}")
+
+    """
+    Generate diet plan and create PDF
+    
+    Args:
+        input_path: Path to input JSON file
+        output_pdf: Path for output PDF
+        format_type: "table" for table format, "detailed" for detailed format
+    """
+    print(f"Loading input from: {input_path}")
     data = load_input(input_path)
-    plan = generate_plan(data, csv_path)
+    
+    print("Generating diet plan...")
+    plan = generate_plan(data)
+    
     # Debug: Print the plan structure
-    print("\n=== Plan Structure ===")
-    print(json.dumps(plan, indent=2))
-    print("=====================\n")
-    create_pdf(plan, output_pdf)
-    print(f"✅ Generated {output_pdf}")
-
-def demonstrate_quantity_adjustment():
-    """Demonstrate how quantity adjustment works for different goals"""
-    print("=== QUANTITY ADJUSTMENT DEMONSTRATION ===\n")
+    print("\n=== Plan Structure Preview ===")
+    if "7DayPlan" in plan and len(plan["7DayPlan"]) > 0:
+        first_day = plan["7DayPlan"][0]
+        print(f"First day structure: {first_day.get('Day', 'Unknown')}")
+        for meal_name, meal_data in first_day.items():
+            if meal_name != "Day":
+                preview = str(meal_data)[:100] + "..." if len(str(meal_data)) > 100 else str(meal_data)
+                print(f"  {meal_name}: {preview}")
+    print("===============================\n")
     
-    # Sample user profiles for different goals
-    sample_profiles = [
-        {
-            "Name of the employee": "John",
-            "Age": "25",
-            "Gender": "Male", 
-            "Weight & Height": "70kg, 175cm",
-            "Activity level": "Moderately active",
-            "Goals": "fat loss",
-            "Diet type": "Vegetarian",
-            "Meal frequency in a day": "3",
-            "Non-Veg Days": [],
-            "Health Conditions": [],
-            "Culture preference": "Mixed",
-            "Any food allergies": "",
-            "Lab Values": {},
-            "Dislikes": [],
-            "Ingredient Frequency": {}
-        },
-        {
-            "Name of the employee": "Sarah",
-            "Age": "28",
-            "Gender": "Female",
-            "Weight & Height": "55kg, 160cm", 
-            "Activity level": "Very active",
-            "Goals": "muscle gain",
-            "Diet type": "Eggetarian",
-            "Meal frequency in a day": "4",
-            "Non-Veg Days": [],
-            "Health Conditions": [],
-            "Culture preference": "North Indian",
-            "Any food allergies": "",
-            "Lab Values": {},
-            "Dislikes": [],
-            "Ingredient Frequency": {}
-        },
-        {
-            "Name of the employee": "Mike",
-            "Age": "30",
-            "Gender": "Male",
-            "Weight & Height": "65kg, 180cm",
-            "Activity level": "Sedentary", 
-            "Goals": "weight gain",
-            "Diet type": "Non-vegetarian",
-            "Meal frequency in a day": "3",
-            "Non-Veg Days": ["Monday", "Wednesday", "Friday"],
-            "Health Conditions": [],
-            "Culture preference": "Mixed",
-            "Any food allergies": "",
-            "Lab Values": {},
-            "Dislikes": [],
-            "Ingredient Frequency": {}
-        }
-    ]
+    # Validate format
+    validate_plan_format(plan)
     
-    for i, profile in enumerate(sample_profiles, 1):
-        goal = profile["Goals"]
-        multiplier = calculate_quantity_multiplier(goal, profile)
-        
-        print(f"Profile {i}: {profile['Name of the employee']} - {goal.upper()}")
-        print(f"  Activity: {profile['Activity level']}")
-        print(f"  Quantity Multiplier: {multiplier}x")
-        print(f"  Example adjustments:")
-        print(f"    - 1 bowl (200g) → {multiplier:.1f} bowl ({int(200*multiplier)}g)")
-        print(f"    - 2 pieces (100g) → {multiplier*2:.1f} pieces ({int(100*multiplier)}g)")
-        print(f"    - 1 cup (150g) → {multiplier:.1f} cup ({int(150*multiplier)}g)")
-        print()
-
-def demo_quantity_feature():
-    """Demo the quantity adjustment feature"""
-    print("🍽️  Wellnetic Diet Plan Generator - Quantity Adjustment Demo")
-    print("=" * 60)
+    # Create PDF based on format type
+    print(f"Creating {format_type} format PDF...")
+    if format_type.lower() == "detailed":
+        create_detailed_pdf(plan, output_pdf)
+    else:
+        create_pdf(plan, output_pdf)
     
-    # Demonstrate quantity adjustment
-    demonstrate_quantity_adjustment()
+    print(f"OK Generated {output_pdf}")
     
-    # Sample user data
-    user_data = {
-        "Name of the employee": "Test User",
-        "Age": "25",
-        "Gender": "Male",
-        "Weight & Height": "70kg, 175cm",
-        "Activity level": "Moderately active",
-        "Goals": "fat loss",  # Try different goals: "fat loss", "muscle gain", "weight gain", "general wellness"
-        "Diet type": "Vegetarian",
-        "Meal frequency in a day": "3",
-        "Non-Veg Days": [],
-        "Health Conditions": [],
-        "Culture preference": "Mixed",
-        "Any food allergies": "",
-        "Lab Values": {},
-        "Dislikes": [],
-        "Ingredient Frequency": {}
-    }
-    
-    print(f"📋 Generating plan for: {user_data['Name of the employee']}")
-    print(f"🎯 Goal: {user_data['Goals']}")
-    print(f"🥗 Diet: {user_data['Diet type']}")
-    
-    # Calculate and show quantity multiplier
-    multiplier = calculate_quantity_multiplier(user_data['Goals'], user_data)
-    print(f"📏 Quantity multiplier: {multiplier}x")
-    print()
-    
-    try:
-        # Generate plan
-        plan = generate_plan(user_data)
-        
-        # Save as JSON
-        with open("diet_plan.json", "w") as f:
-            json.dump(plan, f, indent=2)
-        print("✅ Plan saved as diet_plan.json")
-        
-        # Generate PDF
-        create_pdf(plan, "output.pdf")
-        print("✅ PDF saved as output.pdf")
-        
-        # Show summary
-        summary = plan.get("Summary", {})
-        print(f"\n📊 Plan Summary:")
-        print(f"   Average Calories: {summary.get('AverageCalories', 'N/A')}")
-        avg_macros = summary.get('AverageMacros', {})
-        print(f"   Average Protein: {avg_macros.get('Protein', 'N/A')}")
-        print(f"   Average Carbs: {avg_macros.get('Carbs', 'N/A')}")
-        print(f"   Average Fats: {avg_macros.get('Fats', 'N/A')}")
-        
-    except Exception as e:
-        print(f"❌ Error generating plan: {e}")
-        import traceback
-        traceback.print_exc()
+    # Print summary if available
+    if "Summary" in plan:
+        print(f"\nPlan Summary:")
+        summary = plan["Summary"]
+        if "AverageCalories" in summary:
+            print(f"   Average Calories: {summary['AverageCalories']}")
+        if "AverageMacros" in summary:
+            macros = summary["AverageMacros"]
+            print(f"   Average Macros: P:{macros.get('Protein', 'N/A')} | C:{macros.get('Carbs', 'N/A')} | F:{macros.get('Fats', 'N/A')}")
 
 if __name__ == "__main__":
-    if len(sys.argv) == 1:
-        # Run demo if no arguments provided
-        demo_quantity_feature()
-    elif len(sys.argv) < 3 or len(sys.argv) > 4:
-        print("Usage: python -m ai_engine.main [<input.json> <output.pdf> [CuisineList.csv]]")
-        print("       python -m ai_engine.main  # Run demo")
+    if len(sys.argv) < 3:
+        print("Usage: python -m ai_engine.main <input.json> <output.pdf> [format]")
+        print("  format: 'table' (default) or 'detailed'")
+        print("Examples:")
+        print("  python -m ai_engine.main input.json output.pdf")
+        print("  python -m ai_engine.main input.json output.pdf table")
+        print("  python -m ai_engine.main input.json output.pdf detailed")
         sys.exit(1)
-    else:
-        # Run with arguments
-        input_path = sys.argv[1]
-        output_pdf = sys.argv[2]
-        csv_path = sys.argv[3] if len(sys.argv) == 4 else "samples/CuisineList.csv"
-        
-        run(input_path, output_pdf, csv_path)
+    
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    pdf_format = sys.argv[3] if len(sys.argv) > 3 else "table"
+    
+    run(input_file, output_file, pdf_format)
