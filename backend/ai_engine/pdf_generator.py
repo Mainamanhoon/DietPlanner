@@ -169,7 +169,7 @@ def create_pdf(plan: dict, filename: str):
     pdf.ln()
 
     # Body
-    padding     = 2
+    padding     = 4
     line_height = 4
     pdf.set_font("Helvetica", "", 8)
 

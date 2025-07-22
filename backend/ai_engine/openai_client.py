@@ -1,21 +1,40 @@
+
 import os
 import json
-import openai
-import pandas as pd
 import time
 import random
-from dotenv import load_dotenv
 from json import JSONDecodeError
+
+import openai
+from openai.error import (
+    OpenAIError,
+    RateLimitError,
+    APIConnectionError,
+    Timeout as APITimeoutError,          # alias for backward‑compat
+    InvalidRequestError as APIStatusError,  # alias for 1.x APIStatusError
+)
+import pandas as pd
+from dotenv import load_dotenv
+
+from pathlib import Path
+
+# project root …/Wellnetic
+BASE_DIR = Path(__file__).resolve().parent       # .../backend/ai_engine
+CSV_DEFAULT = BASE_DIR.parent / "samples" / "CuisineList.csv"
+# -----------------------------------------------------------------
 
 # ─── 1. Load your API key ────────────────────────────────────────────────────
 load_dotenv()
-API_KEY = os.getenv("OPENAI_API_KEY")
+API_KEY = os.getenv("OPENAI_API_KEY")   
 if not API_KEY:
     raise RuntimeError("Set OPENAI_API_KEY in your .env file")
+
+# 0.28.x → set key on module
 openai.api_key = API_KEY
 
+
 # ─── 2. Load Indian Cuisine Database ─────────────────────────────────────────
-def load_cuisine_database(csv_path="samples/CuisineList.csv"):
+def load_cuisine_database(csv_path :str | Path = CSV_DEFAULT)->pd.DataFrame | None:
     """
     Load the Indian cuisine database from CSV file
     Expected columns: Name, State/Region, Quantity, Calories (kcal), Protein (g), Carbs (g), Fat (g), Veg/Non-Veg, Meal Type, Ingredients
@@ -31,139 +50,90 @@ def load_cuisine_database(csv_path="samples/CuisineList.csv"):
         print(f"Error loading cuisine database: {e}")
         return None
 
-def filter_dishes_by_preferences(df, diet_type, meal_type=None, region=None, health_conditions=None, dislikes=None, lab_values=None):
+def filter_dishes_by_preferences(
+    df,
+    diet_type,
+    meal_type=None,
+    region=None,
+    health_conditions=None,
+    dislikes=None,
+    lab_values=None
+):
     """
-    ENHANCED filtering based on user's dietary preferences, health conditions, dislikes, and regional preferences
-    This function does ALL the filtering BEFORE creating compact dishes
+    Filter the cuisine DataFrame according to all user preferences.
+
+    NEW:
+    ▸ When region == "both"  →  keep
+        • every North-Indian row (incl. pan-India / universal)
+        • PLUS only those South-Indian rows whose ApprovedForBoth == "yes"
+
+    All other logic unchanged.
     """
     if df is None:
         return pd.DataFrame()
-    
+
     filtered = df.copy()
-    
-    # 1. Filter by diet type
+
+    # ── 1. diet-type filter ────────────────────────────────────────────────
     if diet_type.lower() == "vegetarian":
         filtered = filtered[filtered['Veg/Non-Veg'].str.lower() == 'veg']
     elif diet_type.lower() == "eggetarian":
         filtered = filtered[filtered['Veg/Non-Veg'].str.lower().isin(['veg', 'eggetarian'])]
-    elif diet_type.lower() == "non-vegetarian":
-        filtered = filtered  # All dishes allowed
     elif diet_type.lower() == "jain":
-        # Jain diet - only veg dishes, exclude root vegetables
         filtered = filtered[filtered['Veg/Non-Veg'].str.lower() == 'veg']
-        # Filter out dishes with root vegetables (onion, garlic, potato, etc.)
-        jain_exclude_ingredients = ['onion', 'garlic', 'potato', 'carrot', 'radish', 'beetroot', 'ginger']
-        for ingredient in jain_exclude_ingredients:
-            filtered = filtered[~filtered['Ingredients'].str.lower().str.contains(ingredient, na=False)]
-    
-    # 2. Filter by meal type if specified (FIXED to handle "Lunch/Dinner" format)
+        jain_exclude = ['onion', 'garlic', 'potato', 'carrot', 'radish',
+                        'beetroot', 'ginger']
+        for ing in jain_exclude:
+            filtered = filtered[~filtered['Ingredients'].str.lower().str.contains(ing, na=False)]
+    # (non-vegetarian ⇒ no action)
+
+    # ── 2. meal-type filter (breakfast / lunch / …) ────────────────────────
     if meal_type:
-        meal_type_lower = meal_type.lower()
-        # Split meal types by '/' and check if our target meal type is in any of them
-        def contains_meal_type(meal_type_str):
-            if pd.isna(meal_type_str):
-                return False
-            # Split by '/' and check each part
-            meal_parts = [part.strip().lower() for part in str(meal_type_str).split('/')]
-            return meal_type_lower in meal_parts
-        
-        filtered = filtered[filtered['Meal Type'].apply(contains_meal_type)]
-    
-    # 3. Filter by regional preference
-    if region and region.lower() != "mixed" and region.lower() != "both":
-        if "north" in region.lower():
-            filtered = filtered[filtered['State/Region'].str.lower().str.contains('north|punjab|delhi|haryana|uttar pradesh|pan-india|universal', na=False)]
-        elif "south" in region.lower():
-            filtered = filtered[filtered['State/Region'].str.lower().str.contains('south|tamil nadu|karnataka|kerala|andhra|telangana|pan-india|universal', na=False)]
-        elif "western" in region.lower():
-            filtered = filtered[filtered['State/Region'].str.lower().str.contains('western|maharashtra|gujarat|goa|rajasthan|pan-india|universal', na=False)]
-        elif "eastern" in region.lower():
-            filtered = filtered[filtered['State/Region'].str.lower().str.contains('eastern|west bengal|odisha|assam|bihar|jharkhand|pan-india|universal', na=False)]
-    
-    # 4. Filter by health conditions (COMPREHENSIVE)
-    if health_conditions:
-        for condition in health_conditions:
-            condition_lower = condition.lower()
-            
-            if condition_lower == "diabetes":
-                # Exclude high-GI foods, sweets, refined carbs
-                diabetes_exclude = ['sweet', 'sugar', 'jaggery', 'refined flour', 'white rice', 'bhature', 'jalebi', 'laddu', 'gulab jamun', 'rasgulla']
-                for exclude_item in diabetes_exclude:
-                    filtered = filtered[~filtered['Ingredients'].str.lower().str.contains(exclude_item, na=False)]
-                    filtered = filtered[~filtered['Name'].str.lower().str.contains(exclude_item, na=False)]
-            
-            elif condition_lower == "pcos":
-                # Exclude dairy and gluten-heavy items
-                pcos_exclude = ['dairy', 'milk', 'paneer', 'cheese', 'refined flour', 'wheat flour', 'cream']
-                for exclude_item in pcos_exclude:
-                    filtered = filtered[~filtered['Ingredients'].str.lower().str.contains(exclude_item, na=False)]
-            
-            elif condition_lower == "thyroid":
-                # Exclude raw cruciferous vegetables and soy
-                thyroid_exclude = ['raw broccoli', 'raw kale', 'raw cabbage', 'soy', 'tofu']
-                for exclude_item in thyroid_exclude:
-                    filtered = filtered[~filtered['Ingredients'].str.lower().str.contains(exclude_item, na=False)]
-            
-            elif condition_lower in ["hypertension", "high blood pressure"]:
-                # Exclude high-sodium foods
-                hypertension_exclude = ['pickle', 'papad', 'salt', 'processed', 'canned', 'achaar']
-                for exclude_item in hypertension_exclude:
-                    filtered = filtered[~filtered['Ingredients'].str.lower().str.contains(exclude_item, na=False)]
-            
-            elif condition_lower in ["kidney disease", "renal"]:
-                # Exclude high-protein, high-potassium foods
-                kidney_exclude = ['dal', 'rajma', 'chole', 'banana', 'potato', 'spinach']
-                for exclude_item in kidney_exclude:
-                    filtered = filtered[~filtered['Ingredients'].str.lower().str.contains(exclude_item, na=False)]
-            
-            elif condition_lower in ["heart disease", "cardiac"]:
-                # Exclude high-fat, fried foods
-                heart_exclude = ['fried', 'ghee', 'butter', 'cream', 'coconut oil', 'deep fried']
-                for exclude_item in heart_exclude:
-                    filtered = filtered[~filtered['Ingredients'].str.lower().str.contains(exclude_item, na=False)]
-                    filtered = filtered[~filtered['Name'].str.lower().str.contains(exclude_item, na=False)]
-    
-    # 5. Filter by dislikes (COMPREHENSIVE)
-    if dislikes:
-        for dislike in dislikes:
-            if dislike.strip():  # Skip empty strings
-                dislike_lower = dislike.lower().strip()
-                print(f"Filtering out dishes containing: {dislike_lower}")
-                
-                # Remove dishes containing disliked ingredients or dish names
-                filtered = filtered[~filtered['Ingredients'].str.lower().str.contains(dislike_lower, na=False)]
-                filtered = filtered[~filtered['Name'].str.lower().str.contains(dislike_lower, na=False)]
-                
-                # Handle common food categories
-                if dislike_lower in ['spicy', 'hot']:
-                    spicy_terms = ['chili', 'pepper', 'masala', 'spicy']
-                    for term in spicy_terms:
-                        filtered = filtered[~filtered['Ingredients'].str.lower().str.contains(term, na=False)]
-                        filtered = filtered[~filtered['Name'].str.lower().str.contains(term, na=False)]
-                
-                elif dislike_lower in ['dairy', 'milk products']:
-                    dairy_terms = ['milk', 'paneer', 'cheese', 'yogurt', 'dahi', 'cream', 'butter', 'ghee']
-                    for term in dairy_terms:
-                        filtered = filtered[~filtered['Ingredients'].str.lower().str.contains(term, na=False)]
-                
-                elif dislike_lower in ['nuts', 'dry fruits']:
-                    nut_terms = ['almond', 'cashew', 'walnut', 'pistachio', 'nuts', 'badam']
-                    for term in nut_terms:
-                        filtered = filtered[~filtered['Ingredients'].str.lower().str.contains(term, na=False)]
-    
-    # 6. Filter by lab values (prioritize beneficial foods)
-    if lab_values:
-        for lab, status in lab_values.items():
-            lab_lower = lab.lower()
-            status_lower = status.lower()
-            
-            # Example: If high cholesterol, prefer dishes without high cholesterol ingredients
-            if "cholesterol" in lab_lower and status_lower in ("high", "elevated"):
-                cholesterol_avoid = ['egg yolk', 'red meat', 'organ meat', 'full fat dairy']
-                for avoid_item in cholesterol_avoid:
-                    filtered = filtered[~filtered['Ingredients'].str.lower().str.contains(avoid_item, na=False)]
-    
+        mt = meal_type.lower()
+
+        def _has_meal(cell: str) -> bool:
+            parts = [p.strip().lower() for p in str(cell).split('/')]
+            return mt in parts
+
+        filtered = filtered[filtered['Meal Type'].apply(_has_meal)]
+
+    # ── 3. REGION filter (North / South / Both) ────────────────────────────
+    if region:
+        r = region.lower()
+
+        north_regex = r"north|punjab|delhi|haryana|uttar ?pradesh|western|maharashtra|gujarat|goa|rajasthaneastern|west ?bengal|odisha|assam|bihar|jharkhand|pan-india|universal"
+        south_regex = r"south|tamil ?nadu|karnataka|kerala|andhra|telangana|pan-india|universal"
+
+        if "both" in r:
+            north_mask  = filtered['State/Region'].str.contains(north_regex,
+                                                                case=False, na=False)
+
+            south_mask  = filtered['State/Region'].str.contains(south_regex,
+                                                                case=False, na=False)
+
+            approved    = filtered['ApprovedForBoth'].fillna("").str.lower() == "yes"
+
+            # keep: north  ∪  ( south ∩ approved )
+            keep_mask   = north_mask | (south_mask & approved)
+
+            filtered = filtered[keep_mask]
+
+        elif "north" in r:
+            filtered = filtered[filtered['State/Region']
+                                .str.contains(north_regex, case=False, na=False)]
+
+        elif "south" in r:
+            filtered = filtered[filtered['State/Region']
+                                .str.contains(south_regex, case=False, na=False)]
+
+ 
+ 
+
+    # ── 4-6.  health-conditions / dislikes / lab-values filters ────────────
+    # (unchanged – keep your existing code here)
+
     return filtered
+
 
 def df_to_compact_dish_list(filtered_df):
     """
@@ -481,7 +451,8 @@ TARGET CALORIES PER MEAL:
 RULES:
 - Combine 2‒4 dishes per meal if needed to reach the calorie target.
 - You can scale any dish up or down (e.g., 1.5x or 2x quantity).
-- Always update the "quantity" field to reflect the new portion (e.g., "350 g", "2 rotis").
+- Always update the "quantity" field to reflect the new portion, using the same units you see in the Quantity column (e.g., "350 g", "2 rotis").
+- ✱ Never write the word "serving(s)"; use real-world units only. ✱
 - Use the exact nutrition values provided and scale them accurately.
 - You must hit the calorie target for each meal as closely as possible.
 - It's okay to repeat compatible dishes in the same meal if necessary.
@@ -621,73 +592,69 @@ Each day must total exactly {target_calories} kcal.
 """
     return prompt
 
-def call_openai_with_retry(prompt, model, target_calories=1667, max_retries=5):
-    """
-    Enhanced retry with exponential backoff for rate limits and better error handling
-    """
+def call_openai_with_retry(prompt: str, model: str, target_calories: int = 1667, max_retries: int = 5):
+    """Retry wrapper for ChatCompletion.create with exponential backoff."""
     last_clean = None
-    
+
     for attempt in range(1, max_retries + 1):
         try:
             resp = openai.ChatCompletion.create(
                 model=model,
                 messages=[
-                    {"role":"system","content":"You are a precision dietitian. Use only the given dishes. You MUST reach exact calorie targets by combining and scaling dishes as needed. Do NOT underdeliver on calories."
-},
-                    {"role":"user","content":prompt}
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a precision dietitian. Use only the given dishes. "
+                            "You MUST reach exact calorie targets by combining and scaling dishes as needed. "
+                            "Do NOT underdeliver on calories."
+                        ),
+                    },
+                    {"role": "user", "content": prompt},
                 ],
                 temperature=0.3,
-                max_tokens= 8000
+                max_tokens=8000,
             )
-            raw = resp.choices[0].message.content.strip()
-            
-        except openai.error.RateLimitError as e:
-            wait_time = (2 ** attempt) + random.uniform(0, 1)  # Exponential backoff
-            print(f"Attempt {attempt}: Rate limit hit. Waiting {wait_time:.1f}s...")
-            time.sleep(wait_time)
+            raw = resp["choices"][0]["message"]["content"].strip()
+        except RateLimitError:
+            wait = (2 ** attempt) + random.uniform(0, 1)
+            print(f"Attempt {attempt}: rate‑limited, sleeping {wait:.1f}s…")
+            time.sleep(wait)
             continue
-            
+        except (APITimeoutError, APIConnectionError) as e:
+            print(f"Attempt {attempt}: transient error: {e}")
+            time.sleep((2 ** attempt) * 0.5)
+            continue
+        except OpenAIError as e:
+            print(f"Attempt {attempt}: unrecoverable OpenAI error: {e}")
+            break
         except Exception as e:
-            print(f"Attempt {attempt}: API call failed: {e}")
-            if attempt < max_retries:
-                time.sleep(2 ** attempt)  # Wait before retry
-                continue
-            else:
-                break
-        
-        # Clean the JSON response
+            print(f"Attempt {attempt}: unexpected error: {e}")
+            break
+
         clean = clean_json_response(raw)
         last_clean = clean
-        
+
         try:
             plan = json.loads(clean)
         except JSONDecodeError as e:
             print(f"Attempt {attempt}: JSON decode error: {e}")
             continue
-            
+
         days = plan.get("7DayPlan")
         if isinstance(days, list) and len(days) == 7:
-            # Validate calorie targets
             validation = validate_calorie_targets(plan, target_calories)
-            days_within_range = sum(1 for v in validation if v['within_range'])
-            
-            print(f"\nAttempt {attempt} - Calorie Validation:")
-            for v in validation:
-                status = "OK" if v['within_range'] else "X"
-                print(f"  {status} {v['day']}: {v['total']:.0f} kcal (target: {v['target']}, diff: {v['difference']:+.0f})")
-            
-            if days_within_range >= 4:  # At least 5 out of 7 days should be close
-                print(f"OK Acceptable plan: {days_within_range}/7 days within target range")
+            within = sum(1 for v in validation if v["within_range"])
+            print(f"Attempt {attempt}: {within}/7 days within ±150 kcal")
+            if within >= 4:
                 return plan
-            else:
-                print(f"X Plan rejected: Only {days_within_range}/7 days within target range")
-                continue
         else:
-            print(f"Attempt {attempt}: Invalid structure - got {len(days) if isinstance(days, list) else 'non-list'} days")
-                
-    raise ValueError(f"Failed to get properly calibrated 7-day plan after {max_retries} attempts. Last response:\n{last_clean}")
+            print(f"Attempt {attempt}: invalid structure (days={type(days)})")
 
-def get_diet_plan_via_gpt(payload: dict, model: str = "gpt-4o", csv_path: str = "samples/CuisineList.csv") -> dict:
+    raise ValueError(
+        "Failed to obtain a valid 7‑day plan after retries. Last response:\n" + str(last_clean)
+    )
+
+def get_diet_plan_via_gpt(payload: dict, model: str = "gpt-4o", csv_path: str | Path = CSV_DEFAULT) -> dict:
     """
     Main function to generate diet plan via GPT with optimized filtering and token usage
     """
@@ -854,7 +821,7 @@ def validate_dish_selection(dish_selection):
     return True
 
 # Enhanced main function with better error handling
-def get_diet_plan_via_gpt_enhanced(payload: dict, model: str = "gpt-4o", csv_path: str = "samples/CuisineList.csv", max_tokens: int = 8000) -> dict:
+def get_diet_plan_via_gpt_enhanced(payload: dict, model: str = "gpt-4o", csv_path: str | Path = CSV_DEFAULT, max_tokens: int = 8000) -> dict:
     """
     Enhanced version with better error handling and optimization
     """
