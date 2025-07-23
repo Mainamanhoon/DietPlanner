@@ -41,22 +41,21 @@ def int_str(val, default: int | None = None) -> str:
         return str(default) if default is not None else ""
 
 
-# Mapping verbose headers → concise internal names
+# ── canonical column map ─────────────────────────────────────────────────
 COLUMN_MAP = {
-    "Name of the employee":                                        "Name",
-    "Name of the employees": "Name",   # ← plural variant
-
-    "Official Email address":                                      "Email",
-    "Current body Weight":                                         "Weight",
-    "Current Height (in cm)":                                      "Height",
-    "Current body Height":                                         "Height",
+    "Name of the employee":  "Name",
+    "Name of the employees": "Name",
+    "Official Email address": "Email",
+    "Current body Weight":    "Weight",
+    "Current Height (in cm)": "Height",
+    "Current body Height":    "Height",
     "Are there any preferred day you don't eat non-vegetarian food":
         "Non-Veg Days",
     "Any regional preference ( state wise)(like North Indian or south indian)":
         "Culture preference",
     "Any food allergies (Gluten intolerance / Lactose Intolerance or any other)":
         "Any food allergies",
-    "Goals" : "Goals",
+    "Goals": "Goals",
 }
 
 LIST_KEYS = {"Non-Veg Days", "Health Conditions"}
@@ -68,7 +67,9 @@ def row_to_user(row: pd.Series) -> dict:
     row = row.rename(index=lambda c: COLUMN_MAP.get(c, c))
 
     # ---------- numeric sanitation ----------
-    name = str(row.get("Name", "") or row.get("Name of the employee", "Anonymous")).strip()
+    name = str( row.get("Name of the employee", "Anonymous")).strip()
+    email = str(row.get("Official Email address","")).strip()
+    department = str(row.get("Department", "")).strip()
     weight_val = int_str(row.get("Weight", 60), 60)
     height_val = int_str(row.get("Height", 170), 170)
     age_val    = int_str(row.get("Age", ""),   "")
@@ -80,25 +81,24 @@ def row_to_user(row: pd.Series) -> dict:
 
     # ---------- profile ----------
     profile = {
-        "Name":      name,
-        "Email":     str(row.get("Email", "")).strip(),
-        "Department": str(row.get("Department", "")).strip(),
-        "Gender":    str(row.get("Gender", "")).strip(),
-        "Age":       age_val,
-        "Weight":    f"{weight_val} kg",
-        "Height":    f"{height_val} cm",
-        "Weight & Height": f"{weight_val} kg, {height_val} cm",
-        "Activity level": activity,
-        "Stress level":   stress,
-        "Goals":      str(row.get("Goals", "General wellness")).strip(),
-        "Diet type":  str(row.get("Diet type", "Mixed")).strip(),
+        "Name of the employee":               name,
+        "Official Email address":             email,
+        "Department":         department,
+        "Gender":             str(row.get("Gender", "")).strip(),
+        "Age":                age_val,
+        "Weight & Height":    f"{weight_val} kg, {height_val} cm",
+        "Activity level":     activity,
+        "Rate your stress level": stress,
+        "Goals":              goals,
+        "Diet type":          str(row.get("Diet type", "Mixed")).strip(),
         "Meal frequency in a day": meals_per_day,
         "Culture preference": str(row.get("Culture preference", "Indian")).strip(),
         "Any food allergies": str(row.get("Any food allergies", "")).strip(),
-        "Non-Veg Days": str(row.get("Non-Veg Days", "")).strip(),
-        "Additional notes": str(
-            row.get("Any additional information you would like to share", "")
-        ).strip(),
+        "Non-Veg Days":       str(row.get("Non-Veg Days", "")).strip(),
+        "Health Conditions":  str(row.get("Health Conditions", "")).strip(),
+        "Any additional information you would like to share":
+                              str(row.get("Any additional information you would like to share", "")).strip(),
+        "calorie_goal":       str(row.get("Calorie goal", "1800 kcal/day")).strip(),
     }
 
     # list splitting
@@ -109,28 +109,14 @@ def row_to_user(row: pd.Series) -> dict:
     cal_goal = str(row.get("Calorie goal", "1800 kcal/day")).strip()
 
     # ---------- return with legacy root keys for backward-compat ----------
-    return {
-        # old flat keys used by legacy planner/pdf paths
-        "Name" : name,
-        "Age":               age_val,
-        "Gender":            profile["Gender"],
-        "Weight & Height":   profile["Weight & Height"],
-        "Activity level":    activity,
-        "Diet type":         profile["Diet type"],
-        "Meal frequency in a day": meals_per_day,
-        "Goals": goals,
-
-        # modern structure
-        "user_profile": profile,
-        "calorie_goal": cal_goal
-    }
+    return  profile
 
 
 # ── CLI progress menu (optional) ──────────────────────────────────────────
 def display_menu(df: pd.DataFrame):
     print("\nAvailable users\n────────────────")
     for idx, row in df.iterrows():
-        print(f"[{idx:>3}] {row.get('Name', '(unnamed)')}")
+        print(f"[{idx:>3}] {row.get('Name of the employee', '(unnamed)')}")
     print("\nChoose indices (e.g. 0 4 7),  'all', or ENTER to abort.\n")
 
 
@@ -167,7 +153,7 @@ def main(csv_path: pathlib.Path, rows: list[int] | None, force_all: bool):
     for idx in rows:
         row       = df.loc[idx]
         payload   = row_to_user(row)
-        name_raw  = payload["user_profile"]["Name"] or f"user_{idx}"
+        name_raw  = payload["profile"]["Name of the employee"] or f"user_{idx}"
         pdf_file  = OUT_DIR / f"{sanitise(name_raw)}.pdf"
 
         # simple rate-limit guard

@@ -1,4 +1,4 @@
-j,State/Region,ApprovedForBoth,Quantity (g),Calories (kcal),Protein (g),Carbs (g),Fat (g),Veg/Non-Veg,Meal Type,Ingredients
+Name,State/Region,ApprovedForBoth,Quantity (g),Calories (kcal),Protein (g),Carbs (g),Fat (g),Veg/Non-Veg,Meal Type,Ingredients
 Moong dal dosa ,State/Region,yes,1 piece (100g),150,6,25,4,Veg,Breakfast,"Green moong dal, rice, ginger, green chilies, oil"
 Rava Idli,Andhra Pradesh,,2 pieces (100g),70,3,15,1,Veg,Breakfast,"Semolina, yogurt, curry leaves, mustard seeds"
 Appam with Stew,Andhra Pradesh,,1 piece (40g),80,2,18,1,Veg,Breakfast,"Rice flour, coconut milk, yeast, vegetables (potato, carrot), coconut oil"
