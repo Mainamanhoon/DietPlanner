@@ -67,7 +67,12 @@ def row_to_user(row: pd.Series) -> dict:
     row = row.rename(index=lambda c: COLUMN_MAP.get(c, c))
 
     # ---------- numeric sanitation ----------
-    name = str( row.get("Name of the employee", "Anonymous")).strip()
+    name = str(
+         row.get("Name")                      # sometimes already renamed
+         or row.get("Name of the employee")   # common survey header
+         or row.get("Name of the employees")  # plural variant
+         or "Anonymous"
+     ).strip()
     email = str(row.get("Official Email address","")).strip()
     department = str(row.get("Department", "")).strip()
     weight_val = int_str(row.get("Weight", 60), 60)

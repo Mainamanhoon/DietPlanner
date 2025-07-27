@@ -138,10 +138,13 @@ def generate():
     return render_template_string(RESULT_TPL, results=results,
                                   zip_ready=True, zip_name=zip_path.name)
 
-
-@app.route("/download/<zip_name>")
+@app.route("/download/<path:zip_name>")
 def download(zip_name):
-    return send_file(OUT_ROOT / zip_name, as_attachment=True)
+    """Send the requested zip – 404 if it no longer exists."""
+    zip_path = (OUT_ROOT / zip_name).resolve()
+    if not zip_path.exists():
+       flash("File not found – regenerate first."); return redirect(url_for("index"))
+    return send_file(str(zip_path), as_attachment=True)
 
 
 # ── RUN ───────────────────────────────────────────────────────────────────
